@@ -1,0 +1,21 @@
+{
+  "name": "wikigraph",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate": "knex migrate:latest",
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "Travis Horn <travis@travishorn.com> (https://travishorn.com/)",
+  "license": "MIT",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "cheerio": "^1.0.0-rc.12",
+    "knex": "^3.1.0",
+    "p-ratelimit": "^1.0.1",
+    "puppeteer": "^22.11.0"
+  }
+}
