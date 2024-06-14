@@ -1,8 +1,8 @@
 # Wiki Graph
 
-Work in progress.
-
 Crawl a Fandom.com wiki and store connections between pages.
+
+Upcoming: view connections in a force-directed graph.
 
 ## Setup
 
@@ -30,9 +30,11 @@ Migrate the database:
 npm run migrate
 ```
 
-Edit `src/index.js` to set the site `id` (can be anything) and the `baseUrl`
-which should be in the format of this example:
-`https://starwars.fandom.com/wiki/`.
+Edit `src/index.js` and set the following constants:
+
+- `siteId` - Can be anything. Example: `Star Wars`
+- `baseUrl` - The base URL for the wiki site. Example: `https://starwars.fandom.com/wiki/`
+- `mainPageId` - The last part of the URL of the main page. Example: `Main_Page`
 
 Run the crawler:
 
@@ -41,14 +43,13 @@ npm start
 ```
 
 It's set very slow (5 seconds between requests) by default, but you can tweak
-the rate-limiting settings in `src/index.js`.
+the rate-limiting timeout in `src/index.js`.
 
 Data is stored in `dev.sqlite3` or `prod.sqlite3`. Particularly, look at the
 `Edge` table to see connections between pages.
 
 ## To Do
 
-- Allow stop/resume while crawling
 - Visualize the connections using a force-directed graph
 
 ## License

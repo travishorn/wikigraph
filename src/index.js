@@ -1,58 +1,60 @@
 import { db } from "./db.js";
 import puppeteer from "puppeteer";
 import cheerio from "cheerio";
-import { pRateLimit } from "p-ratelimit";
+import { chunk } from "lodash-es";
 
-const site = {
-  id: "Star Wars",
-  baseUrl: "https://starwars.fandom.com/wiki/",
+const siteId = "Elden Ring";
+const baseUrl = "https://eldenring.fandom.com/wiki/";
+const mainPageId = "Elden_Ring_Wiki";
+
+const batchInsertOnConflictIgnore = async (table, rows) => {
+  const chunkedRows = chunk(rows, 10);
+  const insertedRows = [];
+  await db.transaction(async (trx) => {
+    for (const chunk of chunkedRows) {
+      insertedRows.push(
+        await trx(table)
+          .insert(chunk)
+          .onConflict()
+          .ignore()
+      );
+    }
+  });
+  return insertedRows;
 };
-
-const limit = pRateLimit({
-  interval: 5000,
-  rate: 1,
-  concurrency: 1,
-});
-
-await db("Site").insert(site).onConflict().ignore();
 
 const browser = await puppeteer.launch();
 const page = await browser.newPage();
 
-async function crawl(pageId) {
-  console.log(`Crawling \`${pageId}\`.`);
-  let html = (await db("Page").select("html").where({ id: pageId }).limit(1))[0]
-    ?.html;
+await db("Site").insert({
+  id: siteId,
+  baseUrl
+}).onConflict().ignore();
 
-  if (!html) {
-    console.log(`No cache for \`${pageId}\`. Fetching...`);
-    await page.goto(`${site.baseUrl}${pageId}`, { waitUntil: "networkidle2" });
-    html = await page.content();
+await db("Page").insert({
+  siteId,
+  id: mainPageId
+}).onConflict().ignore();
 
-    await db("Page").insert({
-      siteId: site.id,
-      id: pageId,
-      html,
-    });
-  } else {
-    console.log(`Using cache for \`${pageId}\`.`);
-  }
+async function crawlNext() {
+  const pageId = (await db("Page").select("id").where({ html: null }).limit(1))[0]?.id;
+  
+  if (pageId) {
+    console.log(`Scraping \`${pageId}\`.`);
+    await page.goto(`${baseUrl}${pageId}`, { waitUntil: "networkidle2" });
+    const html = await page.content();
+    await db("Page").where({ id: pageId }).update({ html });
 
-  const crawled =
-    (await db("Edge").count().where({ fromPageId: pageId }))[0]["count(*)"] > 0;
-
-  if (!crawled) {
-    console.log(`Crawling edges for \`${pageId}\`.`);
     const $ = cheerio.load(html);
     let edges = [];
 
     $(`main a[href^="/wiki/"]`).each((index, element) => {
-      const parsedUrl = new URL($(element).attr("href"), site.baseUrl);
+      const parsedUrl = new URL($(element).attr("href"), baseUrl);
       parsedUrl.search = "";
       parsedUrl.hash = "";
       const edgePageId = parsedUrl
         .toString()
-        .slice(site.baseUrl.length)
+        .slice(baseUrl.length)
         .split("/")[0];
 
       if (!edgePageId.includes(":")) {
@@ -62,26 +64,30 @@ async function crawl(pageId) {
 
     edges = [...new Set(edges)].map((edge) => {
       return {
-        siteId: site.id,
+        siteId,
         fromPageId: pageId,
         toPageId: edge,
       };
     });
 
-    console.log(`Storing ${edges.length} edges for \`${pageId}\`.`);
-    await db("Edge").insert(edges).onConflict().ignore();
-
-    edges.forEach(async (edge) => {
-      await limit(async () => {
-        await crawl(edge.toPageId);
-      });
+    const pages = edges.map((edge) => {
+      return {
+        siteId,
+        id: edge.toPageId
+      };
     });
+
+    await batchInsertOnConflictIgnore("Edge", edges);
+    await batchInsertOnConflictIgnore("Page", pages);
+
+    setTimeout(async () => {
+      await crawlNext();
+    }, 5000);
   } else {
-    console.log(`Edges already stored for \`${pageId}\`.`);
+    console.log("No unscraped pages.");
+    await browser.close();
+    db.destroy();
   }
 }
 
-await crawl("Main_Page");
-
-//await browser.close();
-//db.destroy();
+await crawlNext();

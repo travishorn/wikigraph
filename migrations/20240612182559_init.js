@@ -11,8 +11,7 @@ export function up(knex) {
     .createTable("Page", function (table) {
       table.text("siteId").notNullable().references("id").inTable("Site");
       table.text("id").notNullable();
-      table.text("html").notNullable();
-      table.text("scraped").notNullable().defaultTo(knex.fn.now());
+      table.text("html");
       table.primary(["siteId", "id"]);
     })
     .createTable("Edge", function (table) {
