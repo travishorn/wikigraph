@@ -3,9 +3,9 @@ import puppeteer from "puppeteer";
 import cheerio from "cheerio";
 import { chunk } from "lodash-es";
 
-const siteId = "Elden Ring";
-const baseUrl = "https://eldenring.fandom.com/wiki/";
-const mainPageId = "Elden_Ring_Wiki";
+const siteId = "Star Wars";
+const baseUrl = "https://starwars.fandom.com/wiki/";
+const mainPageId = "Main_Page";
 
 const batchInsertOnConflictIgnore = async (table, rows) => {
   const chunkedRows = chunk(rows, 10);
