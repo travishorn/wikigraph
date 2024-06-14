@@ -21,6 +21,7 @@ const batchInsertOnConflictIgnore = async (table, rows) => {
 
 const browser = await puppeteer.launch();
 const page = await browser.newPage();
+let consecutiveErrors = 0;
 
 await db("Site").insert({
   id: process.env.SITE_ID,
@@ -37,8 +38,18 @@ async function crawlNext() {
   
   if (pageId) {
     console.log(`Scraping \`${pageId}\`.`);
-    await page.goto(`${process.env.BASE_URL}${pageId}`, { waitUntil: "networkidle2" });
-    const html = await page.content();
+    let html;
+
+    try {
+      await page.goto(`${process.env.BASE_URL}${pageId}`, { waitUntil: "networkidle2" });
+      html = await page.content();
+      consecutiveErrors = 0;
+    } catch(err) {
+      console.log('Error. Skipping.');
+      html = err.message;
+      consecutiveErrors += 1;
+    }
+
     await db("Page").where({ id: pageId }).update({ html });
 
     const $ = cheerio.load(html);
@@ -76,13 +87,21 @@ async function crawlNext() {
     await batchInsertOnConflictIgnore("Edge", edges);
     await batchInsertOnConflictIgnore("Page", pages);
 
-    setTimeout(async () => {
-      await crawlNext();
-    }, Number(process.env.RATE_LIMIT));
+    if (consecutiveErrors >= 3) {
+      console.log('Too many consecutive errors. Stopping.');
+      await browser.close();
+      db.destroy();
+      process.exit(1);
+    } else {
+      setTimeout(async () => {
+        await crawlNext();
+      }, Number(process.env.RATE_LIMIT));
+    }
   } else {
     console.log("No unscraped pages.");
     await browser.close();
     db.destroy();
+    process.exit(0);
   }
 }
 
