@@ -30,20 +30,18 @@ Migrate the database:
 npm run migrate
 ```
 
-Edit `src/index.js` and set the following constants:
+Copy `.env.example` to `.env` and edit it with your configuration:
 
-- `siteId` - Can be anything. Example: `Star Wars`
-- `baseUrl` - The base URL for the wiki site. Example: `https://starwars.fandom.com/wiki/`
-- `mainPageId` - The last part of the URL of the main page. Example: `Main_Page`
+- `SITE_ID` - Something descriptive to identify the site being scraped
+- `BASE_URL` - The base URL for the wiki site
+- `MAIN_PAGE_ID` - The last part of the URL of the main page
+- `RATE_LIMIT` - The number of milliseconds to wait between page requests
 
 Run the crawler:
 
 ```sh
 npm start
 ```
-
-It's set very slow (5 seconds between requests) by default, but you can tweak
-the rate-limiting timeout in `src/index.js`.
 
 Data is stored in `dev.sqlite3` or `prod.sqlite3`. Particularly, look at the
 `Edge` table to see connections between pages.

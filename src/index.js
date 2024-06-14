@@ -3,10 +3,6 @@ import puppeteer from "puppeteer";
 import cheerio from "cheerio";
 import { chunk } from "lodash-es";
 
-const siteId = "Star Wars";
-const baseUrl = "https://starwars.fandom.com/wiki/";
-const mainPageId = "Main_Page";
-
 const batchInsertOnConflictIgnore = async (table, rows) => {
   const chunkedRows = chunk(rows, 10);
   const insertedRows = [];
@@ -27,13 +23,13 @@ const browser = await puppeteer.launch();
 const page = await browser.newPage();
 
 await db("Site").insert({
-  id: siteId,
-  baseUrl
+  id: process.env.SITE_ID,
+  baseUrl: process.env.BASE_URL
 }).onConflict().ignore();
 
 await db("Page").insert({
-  siteId,
-  id: mainPageId
+  siteId: process.env.SITE_ID,
+  id: process.env.MAIN_PAGE_ID
 }).onConflict().ignore();
 
 async function crawlNext() {
@@ -41,7 +37,7 @@ async function crawlNext() {
   
   if (pageId) {
     console.log(`Scraping \`${pageId}\`.`);
-    await page.goto(`${baseUrl}${pageId}`, { waitUntil: "networkidle2" });
+    await page.goto(`${process.env.BASE_URL}${pageId}`, { waitUntil: "networkidle2" });
     const html = await page.content();
     await db("Page").where({ id: pageId }).update({ html });
 
@@ -49,12 +45,12 @@ async function crawlNext() {
     let edges = [];
 
     $(`main a[href^="/wiki/"]`).each((index, element) => {
-      const parsedUrl = new URL($(element).attr("href"), baseUrl);
+      const parsedUrl = new URL($(element).attr("href"), process.env.BASE_URL);
       parsedUrl.search = "";
       parsedUrl.hash = "";
       const edgePageId = parsedUrl
         .toString()
-        .slice(baseUrl.length)
+        .slice(process.env.BASE_URL.length)
         .split("/")[0];
 
       if (!edgePageId.includes(":")) {
@@ -64,7 +60,7 @@ async function crawlNext() {
 
     edges = [...new Set(edges)].map((edge) => {
       return {
-        siteId,
+        siteId: process.env.SITE_ID,
         fromPageId: pageId,
         toPageId: edge,
       };
@@ -72,7 +68,7 @@ async function crawlNext() {
 
     const pages = edges.map((edge) => {
       return {
-        siteId,
+        siteId: process.env.SITE_ID,
         id: edge.toPageId
       };
     });
@@ -82,7 +78,7 @@ async function crawlNext() {
 
     setTimeout(async () => {
       await crawlNext();
-    }, 5000);
+    }, Number(process.env.RATE_LIMIT));
   } else {
     console.log("No unscraped pages.");
     await browser.close();
